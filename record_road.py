@@ -12,5 +12,7 @@
 # Here is an implementation of the first approach
 if __name__ == '__main__':
     import utils
-    utils.start_simulator()
+    simulator = utils.Simulator()
+    
+    simulator.start_simulator()
     

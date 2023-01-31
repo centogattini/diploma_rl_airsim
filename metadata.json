@@ -1,4 +1,4 @@
 {
-    "SimulatorPath":"air_gym\\envs\\simulator\\Blocks.exe"
+    "SimulatorPath":"simulator\\Blocks"
 
 }
