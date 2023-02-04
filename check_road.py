@@ -5,11 +5,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+def dist(x, y):
+    x = np.array(x)
+    y = np.array(y)
+    return np.norm(y-x)
+
 list_of_files = glob.glob('C:\\Users\\stepa\\Documents\\AirSim\\*')
 latest_record = max(list_of_files, key=os.path.getctime) + '\\airsim_rec.txt'
 
 route_record = pd.read_csv(latest_record, sep='\t')[['POS_X','POS_Y']].rename(columns={'POS_X':'x', 'POS_Y':'y'})
-route_record = route_record.round(2).drop_duplicates()
+route_record = route_record.round(1).drop_duplicates()
 route_record['prev_x'] = route_record['x'].shift(1)
 route_record['prev_y'] = route_record['y'].shift(1)
 route_record = route_record.drop(0)
@@ -64,7 +69,7 @@ def test_lanes(x,y,h=3):
         road_left.append(left)
         road_right.append(right)
 
-    get_line = lambda road_line,i : list(map(lambda x: x[i],road_line))
+    get_line = lambda road_line,i : np.array(list(map(lambda x: x[i],road_line)))
 
     xr = get_line(road_right,0)
     yr = get_line(road_right,1)
@@ -72,29 +77,48 @@ def test_lanes(x,y,h=3):
     xl = get_line(road_left,0)
     yl = get_line(road_left,1)
 
-    x_space = np.linspace(-5,80,100)
-    y_space = np.linspace(5,-60,100)
+    x_space = np.linspace(-5,80,50).round(1)
+    y_space = np.linspace(5,-60,50).round(1)
 
     xv, yv = np.meshgrid(x_space, y_space)
 
-    def check_if_inside(x, y):
+    def check_if_inside(x, y,h=3):
         
         # many cases
+        
         y_xl = yl[np.where(xl == x)]
+        y_xl_up = y_xl[y_xl > y]
+        y_xl_down = y_xl[y_xl < y]
+
         y_xr = yr[np.where(xr == x)]
-        # check if y in y_xl, y_xr
-        for l in y_xl:
-            for r in y_xr:
-                if (y < r and y > l) or (y > r and y < l):
-                    return True
+        y_xr_up = y_xr[y_xr > y]
+        y_xr_down = y_xr[y_xr < y]
+        # moving left?
+        # if all arrays are exist
+        adv_min = lambda x: x.min() if x.any() else 10000000
+        adv_max = lambda x: x.max() if x.any() else -10000000 
+        
+        debug = lambda i: print(x,y,'case', i)
+        if adv_min(y_xl_up) < adv_min(y_xr_up) and adv_max(y_xr_down) > adv_max(y_xl_down):
+            return True
+        # moving right?
+        elif adv_min(y_xl_up) > adv_min(y_xr_up) and adv_max(y_xr_down) < adv_max(y_xl_down):
+            return True
 
         x_yl = xl[np.where(yl == y)]
+        x_yl_right = x_yl[x_yl > x]
+        x_yl_left = x_yl[x_yl < x]
+
         x_yr = xr[np.where(yr == y)]
-        # check if x in x_yl, x_yr
-        for l in x_yl:
-            for r in x_yr:
-                if (x < r and x > l) or (x > r and x < l):
-                    return True
+        x_yr_right = x_yr[x_yr > x]
+        x_yr_left = x_yr[x_yr < x]
+        # moving up
+        if adv_min(x_yr_right) < adv_min(x_yl_right) and adv_max(x_yl_left) > adv_max(x_yr_left):
+            return True
+        # moving down?
+        elif adv_min(x_yr_right) > adv_min(x_yl_right) and adv_max(x_yl_left) < adv_max(x_yr_left):
+            return True
+        
         return False
     
     xv_out = []
@@ -102,10 +126,9 @@ def test_lanes(x,y,h=3):
     xv_in = []
     yv_in = []
 
-    for x in xv:
-        for y in yv:
-            for x_, y_ in list(zip(x,y)):
-                print(x_,y_)
+    for x__ in xv:
+        for y__ in yv:
+            for x_, y_ in list(zip(x__,y__)):
                 if check_if_inside(x_, y_):
                     xv_in.append(x_)
                     yv_in.append(y_)
@@ -129,3 +152,5 @@ x = np.array(route_record['x'])
 y = np.array(route_record['y'])
 
 xl,yl,xr,yr = test_lanes(x,y)
+
+
