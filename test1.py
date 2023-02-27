@@ -1,13 +1,10 @@
-# 
-from numpy import random, sqrt
-def uniform():
-    return random.uniform(0,1)
-sample_size = 10000000
-xs = [uniform() for i in range(sample_size)]
-ys = [uniform() for i in range(sample_size)]
-ans = 0
-for i in range(sample_size):
-    x, y = xs[i], ys[i]
-    if sqrt((x-0.5)**2 + (y-0.5)**2) <= 0.5:
-        ans += 1
-print((ans/sample_size)/(0.5**2))
+# test car env
+
+from air_gym.envs.car_env import AirSimCarEnv
+import time
+env = AirSimCarEnv(path_to_sim_binary='C:\\Users\\stepa\\dev\\diploma\\simulator\\Blocks.exe',
+                   road_path='C:\\Users\\stepa\\dev\\diploma\\roads\\train\\2023-02-10-18-57-33.csv',
+                   target_speed=10)
+
+for i in range(1000):
+    env.step([1,0,0])
