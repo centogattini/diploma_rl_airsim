@@ -3,11 +3,16 @@ import gym
 from gym import spaces 
 import airsim
 import numpy as np
-
+from shapely import geometry
+from matplotlib.path import Path
+import math
+from utils import rotate
+from time import sleep
 
 class AirSimCarEnv(gym.Env):
     def __init__(self, path_to_sim_binary):
         os.startfile(path_to_sim_binary)
+        sleep(10)
         self.car = airsim.CarClient(ip='127.0.0.1')
         # action is a continuous vector 
         # action = [steering, throttle, break]
@@ -36,16 +41,70 @@ class AirSimCarEnv(gym.Env):
         # One Autonomous Driving Problem"
         # 
         # We'll try to implement the first approach 
-        # obs = [speed, left_dist, right_dist, front_left_dist, front_right_dist]
-        self.observation_space = spaces.Box(low=np.array([0, 0, 0, 0, 0]), 
-                                            high=np.array([120, 50, 50, 50, 50]))
-        # agent won't see this information. It's needed for debug purposes
-        self.state = {
-            "position": np.zeros(3),
-            "prev_position": np.zeros(3), 
-        }
+        # obs = [speed, left_dist_1, right_dist_1, ... left_dist_3, right_dist_3]
+        self.observation_space = spaces.Box(low=np.array([0, 0, 0, 0, 0, 0, 0]), 
+                                            high=np.array([120, 10, 50, 50, 50, 50, 50]))        
         self.car_controls = airsim.CarControls()
+
+        self.state = {
+            "position": self.car.getCarState().kinematics_estimated.position,
+            "prev_position": np.array([0,0]),
+            "z_yaw": 0,
+        }
+
+        
         # add visualization of learning process (here or in the `render` function)  
+
+    def _get_obs(self, ):
+        SCALE = 8.0 # optional, must be > 3.0 in order to work fine (presumably it doesn't have any impact on learning)
+        position = self.state['position']
+        prev_position = self.state['prev_position']
+        direction = (position - prev_position) / np.linalg.norm(prev_position - position)
+        # build a center line on position, direction 
+        center_line = geometry.LineString([prev_position, prev_position + SCALE*direction])
+        l45_1 = geometry.LineString(rotate(list(center_line.coords),angle=math.pi/4))
+        l45_2 = geometry.LineString(rotate(list(center_line.coords),angle=-math.pi/4))
+        l90_1 = geometry.LineString(rotate(list(center_line.coords),angle=math.pi/2))
+        l90_2 = geometry.LineString(rotate(list(center_line.coords),angle=-math.pi/2))
+        
+        ls = [center_line, l45_1, l45_2, l90_1, l90_2]
+        intersections = []
+        for l in ls:
+            intersection = center_line.intersection(l)
+            if not intersection.is_empty:
+                intersections.append(intersection[0])
+            else:
+                x_lim, y_lim  = l.coords[-1]
+                intersections.append([x_lim, y_lim])
+        obs = self._transform_into_car_coordinates(np.array(intersections)).flatten()
+        # SHAPE [10]
+        return obs 
+        # get lines with angle 90, 30 (for each angle two lines) with the center line 
+        # get first intersections of theese lines with the road lines (in the CAR COORDINATE SYSTEM)
+        # return intersections (in case of missing intersection return smth like (0, 0) - intersection point)
+    
+    def _update_state(self, ):
+        """
+            Updates the state of a vehicle
+            angle, position, velocity,
+        """
+        kinematics = self.car.getCarState().kinematics_estimated
+        x = kinematics.orientation.x_val
+        y = kinematics.orientation.y_val
+        z = kinematics.orientation.z_val
+        w = kinematics.orientation.w_val
+        self.state["z_yaw"] = math.degrees(math.atan2((2.0*(w*z + x*y)), (1.0-2.0*(y**2 + z**2))))
+        self.state["prev_position"]  = self.state['position']
+        self.state["position"] = kinematics.position[0:1]
+
+
+    def _transform_into_car_coordinates(self, points):
+        translated = points - self.state['position']
+        rotated = rotate(points=translated,angle=self.state["z_yaw"])
+        return rotated
+
+    def _reward(self, ):
+        pass
 
     def step(self, ):
         pass
@@ -53,8 +112,6 @@ class AirSimCarEnv(gym.Env):
     def reset(self, ):
         pass
 
-    def render(self, ):
-        pass
-
     def close(self, ):
         pass
+

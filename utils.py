@@ -17,3 +17,17 @@ class Simulator:
     def exit_simulator(self,):
         # subprocess.
         pass
+def rotate(points, angle):
+    """
+    Rotate a point counterclockwise by a given angle around a given origin.
+
+    The angle should be given in radians.
+    """
+    ox, oy = [0,0]
+    rotated_points = []
+    for point in points:
+        px, py = point
+        qx = math.cos(angle) * (px-ox) - math.sin(angle) * (py-oy)
+        qy = math.sin(angle) * (px-ox) + math.cos(angle) * (py-oy)
+        rotated_points.append([qx,qy])
+    return np.array(rotated_points)

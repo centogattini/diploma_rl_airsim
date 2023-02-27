@@ -102,10 +102,6 @@ def get_lanes(x,y,h=3,show=False):
     xl = get_line(road_left,0)
     yl = get_line(road_left,1)
     if show:
-        x_space = np.array(np.arange(-5,80,1))
-        y_space = np.array(np.arange(5,-60,-1))
-        xv, yv = np.meshgrid(x_space, y_space)
-
         plt.plot(xr,yr,'.-',label='right_lane')
         plt.plot(xl,yl,'.-',label='left_lane')
         plt.plot(x,y,'.-',label='center')
