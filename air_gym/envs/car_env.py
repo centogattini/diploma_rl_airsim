@@ -8,9 +8,13 @@ from matplotlib.path import Path
 import math
 from utils import rotate
 from time import sleep
+import pandas as pd
 
 class AirSimCarEnv(gym.Env):
-    def __init__(self, path_to_sim_binary):
+    def __init__(self, 
+                path_to_sim_binary,
+                road_path,
+                target_velocity):
         os.startfile(path_to_sim_binary)
         sleep(10)
         self.car = airsim.CarClient(ip='127.0.0.1')
@@ -47,12 +51,16 @@ class AirSimCarEnv(gym.Env):
         self.car_controls = airsim.CarControls()
 
         self.state = {
-            "position": self.car.getCarState().kinematics_estimated.position,
+            "position": np.array([0,0]),
             "prev_position": np.array([0,0]),
             "z_yaw": 0,
+            "velocity": 0,
         }
+        road_df = pd.read_csv(road_path)
+        xl, yl, xr, yr = road_df['xl'], road_df['yl'], road_df['xr'], road_df['yr']
 
-        
+        self.road_polygon = geometry.Polygon(list(zip(xl, yl))+list(zip(xr,yr))[::-1])
+        self.target_velocity = target_speed
         # add visualization of learning process (here or in the `render` function)  
 
     def _get_obs(self, ):
@@ -93,21 +101,36 @@ class AirSimCarEnv(gym.Env):
         y = kinematics.orientation.y_val
         z = kinematics.orientation.z_val
         w = kinematics.orientation.w_val
+        velocity = kinematics.linear_velocity
         self.state["z_yaw"] = math.degrees(math.atan2((2.0*(w*z + x*y)), (1.0-2.0*(y**2 + z**2))))
-        self.state["prev_position"]  = self.state['position']
+        self.state["prev_position"]  = self.state["position"]
         self.state["position"] = kinematics.position[0:1]
-
+        self.state["velocity"] = velocity
 
     def _transform_into_car_coordinates(self, points):
-        translated = points - self.state['position']
+        translated = points - self.state["position"]
         rotated = rotate(points=translated,angle=self.state["z_yaw"])
         return rotated
 
     def _reward(self, ):
-        pass
+        # calculate reward based on a current state 
+        x, y = self.state["position"]
+        velocity = self.state["velocity"]
+        if self.road_polygon.contains((x,y)):
+            reward = -np.abs((velocity-self.target_velocity))/self.target_velocity
+        else:
+            reward = -1
+        return reward
+    
+    def _get_info(self, ):
+        return None
 
     def step(self, ):
-        pass
+        reward = self._reward()
+        obs = self._get_obs()
+        done = reward <= -1
+        info = self._get_info()
+        return obs, reward, done, info
 
     def reset(self, ):
         pass
